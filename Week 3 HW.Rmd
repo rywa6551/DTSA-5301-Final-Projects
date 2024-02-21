@@ -1,0 +1,101 @@
+---
+title: "Week 3 Project"
+output: pdf_document
+date: "2024-01-31"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library(readr)
+library(tidyverse)
+library(lubridate)
+library(dplyr)
+url_in <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+NYPD_Shooting <- read_csv(url_in)
+```
+
+**Introduction**
+The data we are looking is the NYPD shooting incident data from 1/1/2006 to 12/31/2022. When we look at the head of this data it is filled with data that may or may not be useful to us. So by cleaning up data we can look at the data we should focus on.
+```{r}
+head(NYPD_Shooting)
+
+NYPD_Shootings <- NYPD_Shooting %>% select(-c('INCIDENT_KEY', 'LOC_OF_OCCUR_DESC', 
+                  'JURISDICTION_CODE', 'LOC_CLASSFCTN_DESC', 'LOCATION_DESC', 
+                  'PERP_AGE_GROUP', 'PERP_SEX', 'PERP_RACE', 'VIC_AGE_GROUP', 
+                  'VIC_SEX', 'VIC_RACE', 'X_COORD_CD', 'Y_COORD_CD', 'Latitude', 
+                  'Longitude','Lon_Lat', 'PRECINCT')) %>% 
+                  mutate(OCCUR_DATE = mdy(OCCUR_DATE))
+  
+summary(NYPD_Shootings)
+```
+
+
+```{r}
+NYC_by_Boro <- NYPD_Shootings %>% group_by(BORO) %>%
+  summarize(cases = n(), deaths = sum(STATISTICAL_MURDER_FLAG == TRUE), .groups = 'drop')
+
+ggplot(NYC_by_Boro, aes(x = BORO, y = cases, fill = "BORO")) + 
+  geom_col(aes(x = BORO, y = cases, fill = BORO)) + 
+  geom_col(aes(y = deaths, fill = "deaths")) + 
+  xlab("Borough") + 
+  ylab("Shootings") + 
+  scale_x_discrete(labels=c('Bronx', 'Brooklyn', 'Manhattan', 'Queens', 
+                            'Staten Island')) + 
+  labs(fill = 'Total') + 
+  scale_fill_discrete(labels=c('Bronx', 'Brooklyn', 'Deaths', 'Manhattan', 'Queens', 
+                               'Staten Island'))
+```
+This graph displays the amount of shootings by boroughs in NYC. As shown above, Brooklyn has the highest amount of cases and deaths while Staten Island has lowest amount. However this raises the question about the population of each borough as that may correlate to the low case amount in Staten Island.
+
+
+```{r}
+NYC_Total <- NYPD_Shootings %>% group_by(OCCUR_DATE) %>% 
+summarize(cases = n(), deaths = sum(STATISTICAL_MURDER_FLAG == TRUE), .groups = 'rowwise')
+
+total <- c(0)
+i <- 0
+for(i in 1:nrow(NYC_Total)) {
+  
+  if(i == 1) {
+  total[i] <- NYC_Total$cases[i]
+  }
+  
+  else {
+  total[i] <- NYC_Total$cases[i] + total[i - 1]
+  }
+
+}
+
+NYC_Total <- cbind(NYC_Total, data.frame(total_cases = total))
+
+total <- c(0)
+i <- 0
+for(i in 1:nrow(NYC_Total)) {
+  
+  if(i == 1) {
+  total[i] <- NYC_Total$deaths[i]
+  }
+  
+  else {
+  total[i] <- NYC_Total$deaths[i] + total[i - 1]
+  }
+
+}
+
+NYC_Total <- cbind(NYC_Total, data.frame(total_deaths = total))
+
+ggplot(NYC_Total, aes(x = OCCUR_DATE, y = total_cases)) + 
+  geom_area(aes(fill = "total_cases")) + 
+  geom_area(aes(y = total_deaths, fill = "total_deaths")) + 
+  scale_fill_brewer(palette="Set2", labels=c('Total Shootings', 'Total Deaths')) + 
+  xlab("Date") + 
+  ylab("Total Shootings") + 
+  labs(fill = 'Total')
+```
+This graph displays the amount of shootings over the year and the amount of deaths over the years within NYC. As time goes on the amount of shootings grows at a relatively steady rate until roughly 2021 where there is a sharper increase in shootings. This brings up the question on what happened around that time as a sharp increase in shootings must have some sort of reasoning behind it.
+
+**Conclusion**
+So we can conclude that in NYC as time goes on the amount of shooting and death will only increase over time and that the amount of shootings will drastically vary from borough to borough. Possible sources of bias could be missing data as the data set was taken from a government website and the government could choose to omit data. There should be no personal bias as I have no interest in this sort of subject. 
